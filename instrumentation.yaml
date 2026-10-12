@@ -1,0 +1,26 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: otel-nodejs
+spec:
+  exporter:
+    endpoint: http://10.185.13.105:4318
+  propagators: [tracecontext, baggage]
+  sampler:
+    type: parentbased_always_on
+  env:
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: deployment.environment=dev,site=icolo,k8s.cluster.name=k8-dev-icolo-ipsl-apps
+  nodejs:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-nodejs:0.78.0
+    env:
+      - name: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: http/protobuf
+      - name: OTEL_TRACES_EXPORTER
+        value: otlp
+      - name: OTEL_METRICS_EXPORTER
+        value: none
+      - name: OTEL_LOGS_EXPORTER
+        value: none
+      - name: OTEL_NODE_DISABLED_INSTRUMENTATIONS
+        value: fs,dns,net

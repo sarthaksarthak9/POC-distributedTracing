@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracing-poc-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: tracing-poc-app }
+  template:
+    metadata:
+      labels: { app: tracing-poc-app }
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "otel-nodejs"
+        instrumentation.opentelemetry.io/container-names: "app"
+    spec:
+      containers:
+        - name: app
+          image: node:21-alpine
+          # The image's own entry point is replaced by the start script, as IPSL services do.
+          command: ["/bin/sh", "/app/entrypoint.sh"]
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - name: app
+              mountPath: /app
+      volumes:
+        - name: app
+          configMap:
+            name: tracing-poc-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracing-poc-app
+spec:
+  selector: { app: tracing-poc-app }
+  ports:
+    - port: 3000
