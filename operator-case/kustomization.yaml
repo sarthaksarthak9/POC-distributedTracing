@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tracing-poc
+
+resources:
+  - reconciler.yaml
+
+# Hashed names: changing the desired spec restarts the reconciler with it.
+configMapGenerator:
+  - name: poc-reconciler-script
+    files:
+      - reconcile.sh
+  - name: poc-reconciler-desired
+    files:
+      - desired-deployment.yaml

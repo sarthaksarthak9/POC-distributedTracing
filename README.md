@@ -23,9 +23,12 @@ local Jaeger standing in for the Tier 2 collector.
 | 6 | Order matters | The `Instrumentation` must exist before the pod starts, or the pod is not instrumented; the deploy steps below apply it first |
 | 7 | Readiness probes are traced too | Each probe is a one-span `GET` trace: noise to filter later |
 | 8 | A startup warning is harmless | `MetadataLookupWarning` is the SDK finding no cloud provider |
+| 9 | An operator that enforces its Deployment removes hand-added tracing | Annotations added with `kubectl patch` were reverted within one 15 s cycle, costing two extra rollouts |
+| 10 | Tracing configured through the operator's own spec coexists with it | Steady "in sync", pod traced, 0 restarts: the webhook changes pods only, so the Deployment the operator checks never drifts |
 
 **Not yet tested:** the path from the dev cluster to Tier 2, a real Doppler-based start script,
-and the start-script cases in the table below that stop tracing.
+the start-script cases in the table below that stop tracing, a real third-party operator, and
+operators or policies that validate running pods.
 
 | File | What it is |
 |---|---|
@@ -82,6 +85,49 @@ kubectl -n <namespace> exec <pod> -- sh -c 'grep -n "NODE_OPTIONS\|env -i" <star
 
 The service must end up running `node` (process 1 is `node`, or a shell script that starts it),
 and the script must not set `NODE_OPTIONS` without its existing value.
+
+## Applications managed by another operator
+
+Some applications are deployed by an operator that checks its Deployment against an expected
+configuration and corrects any difference. Does adding tracing conflict with it?
+
+`operator-case/` tests this with a reconciler that stands in for such an operator: every 15
+seconds it compares the pod-template annotations of the `managed-app` Deployment with its desired
+spec (`desired-deployment.yaml`) and replaces the Deployment on any difference. Real operators
+differ in what they compare and how; this models a strict one.
+
+| Case | What we did | Result |
+|---|---|---|
+| A | Added the tracing annotations to the operator-owned Deployment by hand | **Reverted** within one cycle: the operator saw drift and replaced the Deployment. Two extra rollouts, and the pod ended untraced |
+| B | Added the tracing annotations to the operator's desired spec | **Works**: the pod is traced, the operator stays in sync, 0 restarts, and traces arrive |
+
+Why case B causes no conflict: the operator compares the Deployment, and the webhook never
+changes the Deployment. The init container, volume and variables exist only on the pods; the
+Deployment's own spec has no init container.
+
+So, for an operator-managed service:
+
+- Add the annotations through the operator's configuration (commonly a `podAnnotations` field in
+  its custom resource), never on the Deployment it owns.
+- If the operator offers no way to set pod annotations, annotation-based tracing is not possible
+  for that service without changing the operator's configuration model.
+- Check whether the operator, or a policy engine such as Kyverno or Gatekeeper, also validates
+  running pods. Such a check could reject or flag the injected init container; this POC does not
+  cover it.
+
+During the test, the reconciler was itself updated to pick up the new spec, and for a few cycles
+the old and new reconciler pods disagreed and replaced the Deployment in turn. That comes from the
+stand-in having no leader election, not from tracing.
+
+To run it (after the main POC is deployed):
+
+```bash
+kubectl apply -k operator-case/
+kubectl -n tracing-poc logs -f deploy/poc-reconciler
+```
+
+For case A, patch `managed-app` with the two annotations and watch the log report drift. For
+case B, add them to `operator-case/desired-deployment.yaml` and re-apply.
 
 ## Prerequisite
 
