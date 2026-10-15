@@ -1,7 +1,7 @@
 # Tracing POC: Node.js auto-instrumentation
 
 A sample Node.js service that proves the OpenTelemetry Operator injects tracing without changing
-the image, the code or a custom start script.
+the image, the code or a custom start script
 
 ## Summary
 
