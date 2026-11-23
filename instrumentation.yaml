@@ -4,7 +4,10 @@ metadata:
   name: otel-nodejs
 spec:
   exporter:
-    endpoint: http://10.185.13.105:4318
+    endpoint: https://10.185.13.105:4319
+    tls:
+      configMapName: tier2-ca
+      ca_file: ca.crt
   propagators: [tracecontext, baggage]
   sampler:
     type: parentbased_always_on
@@ -24,3 +27,6 @@ spec:
         value: none
       - name: OTEL_NODE_DISABLED_INSTRUMENTATIONS
         value: fs,dns,net
+      # Same CA via Node's trust store, in case this SDK ignores OTEL_EXPORTER_OTLP_CERTIFICATE.
+      - name: NODE_EXTRA_CA_CERTS
+        value: /otel-auto-instrumentation-configmap-tier2-ca/ca.crt

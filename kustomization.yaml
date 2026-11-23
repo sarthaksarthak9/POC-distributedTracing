@@ -16,3 +16,7 @@ configMapGenerator:
     files:
       - app.js
       - entrypoint.sh
+  # CA of the ICOLO Tier 2 aggregator, /etc/alloy/tls/ca.crt on 10.185.13.105.
+  - name: tier2-ca
+    files:
+      - ca.crt=tier2-ca.crt
